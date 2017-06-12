@@ -3,6 +3,7 @@
 import * as path from 'path';
 
 import * as child_process from 'child_process';
+import * as process from 'process';
 
 import { workspace, Disposable, ExtensionContext, languages, window } from 'vscode';
 import { LanguageClient, LanguageClientOptions, SettingMonitor, ServerOptions, TransportKind } from 'vscode-languageclient';
@@ -36,33 +37,32 @@ class Counter {
 export function activate(context: ExtensionContext) {
     let serverOptions: ServerOptions;
 
-    let rls_root = process.env.RLS_ROOT;
-    window.setStatusBarMessage("RLS analysis: starting up");
+    let texls_root = '/home/mrmaxmeier/_GitRepos/texls/'
+
+    window.setStatusBarMessage("TEXLS analysis: starting up");
+    console.log('DEV_MODE: ' + DEV_MODE)
+
+    let options = {
+        cwd: texls_root,
+        env: { 'RUST_BACKTRACE': '1' }
+    };
 
     if (DEV_MODE) {
-        if (rls_root) {
-            serverOptions = {command: "cargo", args: ["run", "--release"], options: { cwd: rls_root } };
-        } else {
-            serverOptions = {command: "rustup", args: ["run", "nightly", "rls"]};
-        }
+        serverOptions = { command: "cargo", args: ["run"], options: options };
     } else {
         serverOptions = () => new Promise<child_process.ChildProcess>((resolve, reject) => {
             function spawnServer(...args: string[]): child_process.ChildProcess {
-                let childProcess;
-                if (rls_root) {
-                    childProcess = child_process.spawn("cargo", ["run", "--release"], { cwd: rls_root });
-                } else {
-                    childProcess = child_process.spawn("rustup", ["run", "nightly", "rls"]);
-                }
+                let cargo_args = ["run", "--manifest-path=" + texls_root + "Cargo.toml"];
+                let childProcess = child_process.spawn("cargo", cargo_args, options);
 
-                childProcess.stderr.on('data', data => {});
+                childProcess.stderr.on('data', data => {
+                    //process.stdout.write(data.toString());
+                    console.log(data.toString().trim())
+                });
                 childProcess.on('error', err => {
-                    if (err.code == "ENOENT") {
-                        console.error("Could not spawn rls process:", err.message);
-                        window.setStatusBarMessage("RLS Error: Could not spawn process");
-                    } else {
-                        throw err;
-                    }
+                    console.error("Could not spawn texls process:", err.message);
+                    window.setStatusBarMessage("TeXLS Error: Could not spawn process");
+                    throw err;
                 })
 
                 return childProcess; // Uses stdin/stdout for communication
@@ -74,8 +74,8 @@ export function activate(context: ExtensionContext) {
 
     // Options to control the language client
     let clientOptions: LanguageClientOptions = {
-        // Register the server for Rust files
-        documentSelector: ['rust'],
+        // Register the server for TeX files
+        documentSelector: ['tex', 'latex'],
         synchronize: {
             // Synchronize the setting section 'languageServerExample' to the server
             configurationSection: 'languageServerExample',
@@ -85,27 +85,27 @@ export function activate(context: ExtensionContext) {
     }
 
     // Create the language client and start the client.
-    let lc = new LanguageClient('Rust Language Server', serverOptions, clientOptions);
+    let lc = new LanguageClient('TeX Language Server', serverOptions, clientOptions);
 
     let runningDiagnostics = new Counter();
-    lc.onNotification({method: "rustDocument/diagnosticsBegin"}, function(f) {
+    lc.onNotification({method: "texDocument/diagnosticsBegin"}, function(f) {
         runningDiagnostics.increment();
 
         if (spinnerTimer == null) {
             let state = 0;
             spinnerTimer = setInterval(function() {
-                window.setStatusBarMessage("RLS analysis: working " + spinner[state]);
+                window.setStatusBarMessage("TeXLS analysis: working " + spinner[state]);
                 state = (state + 1) % spinner.length;
             }, 100);
         }
     })
-    lc.onNotification({method: "rustDocument/diagnosticsEnd"}, function(f) {
+    lc.onNotification({method: "texDocument/diagnosticsEnd"}, function(f) {
         let count = runningDiagnostics.decrementAndGet();
         if (count == 0) {
             clearInterval(spinnerTimer);
             spinnerTimer = null;
 
-            window.setStatusBarMessage("RLS analysis: done");
+            window.setStatusBarMessage("TeXLS analysis: done");
         }
     })
     let disposable = lc.start();

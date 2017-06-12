@@ -1,6 +1,6 @@
 {
-    "name": "rls-vscode",
-    "displayName": "rls-vscode",
+    "name": "texls-vscode",
+    "displayName": "texls-vscode",
     "description": "",
     "version": "0.0.1",
     "publisher": "JonathanTurner",
@@ -17,7 +17,7 @@
         "Other"
     ],
     "activationEvents": [
-        "onLanguage:rust"
+        "onLanguage:latex"
     ],
     "main": "./out/src/extension",
     "scripts": {
